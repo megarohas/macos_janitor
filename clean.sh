@@ -53,6 +53,15 @@ for dir in "${targets[@]}"; do
   fi
 done
 
+# Extra: Clean Chrome and Chrome Dev caches entirely
+echo "🧽 Forcing clean of Chrome and Chrome Dev caches..." | tee -a "$LOGFILE"
+
+rm -rf "$HOME/Library/Application Support/Google/Chrome/Default/{Cache,Code Cache,GPUCache}" 2>/dev/null
+rm -rf "$HOME/Library/Caches/Google/Chrome/Default/{Cache,Code Cache,GPUCache}" 2>/dev/null
+
+rm -rf "$HOME/Library/Application Support/Google/Chrome Dev/Default/{Cache,Code Cache,GPUCache}" 2>/dev/null
+rm -rf "$HOME/Library/Caches/Google/Chrome Dev/Default/{Cache,Code Cache,GPUCache}" 2>/dev/null
+
 # Size after cleaning
 size_after=$(du -sk ${targets[@]} 2>/dev/null | awk '{sum += $1} END {print sum}')
 freed_kb=$((size_before - size_after))
@@ -105,7 +114,3 @@ tmutil listlocalsnapshots / | while read snapshot; do
 done
 
 echo "✅ Cleanup completed: $(date)" | tee -a "$LOGFILE"
-
-# to check logs:
-# tail -f /tmp/clean_output.log
-# tail -f /tmp/clean_error.log
