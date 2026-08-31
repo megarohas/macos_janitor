@@ -9,15 +9,29 @@
 |---|---|---|
 | Кэши | `~/Library/Caches`, `~/.cache` | файлы старше 7 дн. |
 | Браузеры | Chrome, Opera, Firefox, Safari, Slack (Code Cache/GPUCache/cache2) | 7 дн. |
-| Dev | npm, yarn, Playwright, node-gyp, pip, deno, iTerm2 | 7 дн. |
-| Claude | Cache/Code Cache/GPUCache — **только если приложение закрыто** | целиком |
-| Homebrew | `brew cleanup -s --prune=7` | 7 дн. |
+| Dev | npm, yarn, node-gyp, pip, deno, iTerm2, `.zcompdump` | 7 дн. |
+| Playwright | браузеры дорого перекачивать — щадящий порог | 30 дн. |
+| Docker | `docker builder prune` (только если демон запущен) | 7 дн. |
+| Xcode | `simctl delete unavailable` | — |
+| Claude | Cache/Code Cache/GPUCache — **только если приложение закрыто**; логи | целиком / 7 дн. |
+| Приложения | VS Code (логи/кэши), кэши песочниц `Containers`, HTTPStorages, Saved Application State, вложения Mail | 7–30 дн. |
+| Homebrew | `brew cleanup -s --prune=7` + `brew autoremove` | 7 дн. |
 | Логи | `~/Library/Logs` | 30 дн. |
 | Корзина | `~/.Trash` | 30 дн. |
 | MongoDB | ротация `mongod.log` (SIGUSR1), чистка ротированных | 30 дн. |
 
 Принцип: удаляется только то, что приложения пересоздают сами. Данные, настройки,
 профили и проекты не затрагиваются.
+
+### janitor и Mole (`mo clean`)
+
+v2.1 закрывает тот же состав целей, что `mo clean`, но **по возрасту**, а не
+«всё и сразу»: для ежедневного автозапуска так бережнее — горячие кэши не
+пересоздаются каждое утро. Что janitor сознательно **не** повторяет за Mole:
+поиск осиротевших данных удалённых приложений (сложная эвристика — не для
+ночного крона) и разовые операции вроде незавершённых бэкапов Time Machine.
+Для этого Mole и остаётся: janitor — ежедневная гигиена, `mo clean` — ручная
+глубокая чистка. Инструменты не конфликтуют.
 
 ## Установка
 

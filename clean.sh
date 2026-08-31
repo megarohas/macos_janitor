@@ -1,5 +1,7 @@
 #!/bin/bash
-# macos_janitor v2 — ночная уборка macOS
+# macos_janitor v2.1 — ночная уборка macOS
+# v2.1: паритет по охвату с `mo clean` (Mole), но стратегия возрастная,
+# а не «снести всё сейчас» — для ежедневного автозапуска это бережнее.
 # Запускается LaunchAgent'ом com.megarohas.janitor ежедневно в 05:00 (см. install.sh).
 # Философия: удаляем только то, что система/приложения пересоздают сами.
 # Каждая секция независима: ошибка в одной не роняет остальные (set -e намеренно нет).
@@ -58,14 +60,29 @@ dev_dirs=(
   "$HOME/.npm/_logs"
   "$HOME/Library/Caches/Yarn"
   "$HOME/.cache/yarn"
-  "$HOME/Library/Caches/ms-playwright"
   "$HOME/Library/Caches/node-gyp"
   "$HOME/Library/Caches/pip"
   "$HOME/Library/Caches/deno"
   "$HOME/Library/Caches/com.googlecode.iterm2"
 )
 for d in "${dev_dirs[@]}"; do clean_old "$d" "$DAYS_CACHE"; done
-log "dev-кэши: npm/yarn/playwright/node-gyp/pip/deno/iTerm2"
+# браузеры Playwright дорого перекачивать — им отдельный, щадящий порог (30 дн.)
+clean_old "$HOME/Library/Caches/ms-playwright" 30
+log "dev-кэши: npm/yarn/node-gyp/pip/deno/iTerm2 (playwright — 30 дн.)"
+
+# кэш zsh-автодополнений (пересоздаётся при старте шелла)
+find "$HOME" -maxdepth 1 -name ".zcompdump*" -mtime "+$DAYS_CACHE" -delete 2>/dev/null
+
+# Docker/OrbStack: build-кэш старше недели (только если демон запущен)
+if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+  docker builder prune -f --filter "until=168h" >>"$LOG" 2>&1
+  log "docker: build-кэш старше 7 дн. очищен"
+fi
+
+# Симуляторы Xcode: удалить недоступные (после обновлений runtime'ов)
+if command -v xcrun >/dev/null 2>&1; then
+  xcrun simctl delete unavailable >>"$LOG" 2>&1 && log "simctl: недоступные симуляторы удалены"
+fi
 
 # ── 4. Кэши Claude (только если приложение закрыто) ──────────────────────────
 if ! pgrep -xq "Claude"; then
@@ -76,11 +93,26 @@ if ! pgrep -xq "Claude"; then
 else
   log "Claude: запущен — кэши пропущены"
 fi
+clean_old "$HOME/Library/Logs/Claude" "$DAYS_CACHE"
+
+# ── 4б. Кэши и логи приложений (по мотивам mo clean) ────────────────────────
+clean_old "$HOME/Library/Application Support/Code/logs"       "$DAYS_CACHE"
+clean_old "$HOME/Library/Application Support/Code/Cache"      "$DAYS_CACHE"
+clean_old "$HOME/Library/Application Support/Code/CachedData" "$DAYS_CACHE"
+# кэши песочниц (Containers) — только подкаталоги Caches
+for c in "$HOME/Library/Containers"/*/Data/Library/Caches; do
+  clean_old "$c" "$DAYS_CACHE"
+done
+clean_old "$HOME/Library/HTTPStorages"              "$DAYS_LOGS"
+clean_old "$HOME/Library/Saved Application State"   "$DAYS_LOGS"
+clean_old "$HOME/Library/Containers/com.apple.mail/Data/Library/Mail Downloads" "$DAYS_LOGS"
+log "приложения: VS Code, песочницы, HTTPStorages, окна, вложения Mail"
 
 # ── 5. Homebrew ──────────────────────────────────────────────────────────────
 if [ -x "$BREW" ]; then
   "$BREW" cleanup -s --prune="$DAYS_CACHE" >>"$LOG" 2>&1
-  log "brew cleanup выполнен"
+  "$BREW" autoremove >>"$LOG" 2>&1
+  log "brew cleanup + autoremove выполнены"
 fi
 
 # ── 6. Логи и корзина ────────────────────────────────────────────────────────
