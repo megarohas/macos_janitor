@@ -1,56 +1,59 @@
 # macos_janitor
 
-Ночной уборщик macOS: раз в день тихо выметает кэши, старые логи и корзину.
-Работает как пользовательский LaunchAgent — без root, без сторонних «клинеров».
+**English** | [Русский](README.ru.md)
 
-## Что чистит
+A nightly macOS janitor: once a day it quietly sweeps out caches, old logs and
+the Trash. Runs as a user LaunchAgent — no root, no third-party "cleaners".
 
-| Секция | Что именно | Порог |
+## What it cleans
+
+| Section | What exactly | Threshold |
 |---|---|---|
-| Кэши | `~/Library/Caches`, `~/.cache` | файлы старше 7 дн. |
-| Браузеры | Chrome, Opera, Firefox, Safari, Slack (Code Cache/GPUCache/cache2) | 7 дн. |
-| Dev | npm, yarn, node-gyp, pip, deno, iTerm2, `.zcompdump` | 7 дн. |
-| Playwright | браузеры дорого перекачивать — щадящий порог | 30 дн. |
-| Docker | `docker builder prune` (только если демон запущен) | 7 дн. |
+| Caches | `~/Library/Caches`, `~/.cache` | files older than 7 days |
+| Browsers | Chrome, Opera, Firefox, Safari, Slack (Code Cache/GPUCache/cache2) | 7 days |
+| Dev | npm, yarn, node-gyp, pip, deno, iTerm2, `.zcompdump` | 7 days |
+| Playwright | browsers are expensive to re-download — gentler threshold | 30 days |
+| Docker | `docker builder prune` (only if the daemon is running) | 7 days |
 | Xcode | `simctl delete unavailable` | — |
-| Claude | Cache/Code Cache/GPUCache — **только если приложение закрыто**; логи | целиком / 7 дн. |
-| Приложения | VS Code (логи/кэши), кэши песочниц `Containers`, HTTPStorages, Saved Application State, вложения Mail | 7–30 дн. |
-| Homebrew | `brew cleanup -s --prune=7` + `brew autoremove` | 7 дн. |
-| Логи | `~/Library/Logs` | 30 дн. |
-| Корзина | `~/.Trash` | 30 дн. |
-| MongoDB | ротация `mongod.log` (SIGUSR1), чистка ротированных | 30 дн. |
+| Claude | Cache/Code Cache/GPUCache — **only if the app is closed**; logs | all / 7 days |
+| Apps | VS Code (logs/caches), sandbox `Containers` caches, HTTPStorages, Saved Application State, Mail attachments | 7–30 days |
+| Homebrew | `brew cleanup -s --prune=7` + `brew autoremove` | 7 days |
+| Logs | `~/Library/Logs` | 30 days |
+| Trash | `~/.Trash` | 30 days |
+| MongoDB | `mongod.log` rotation (SIGUSR1), cleanup of rotated logs | 30 days |
 
-Принцип: удаляется только то, что приложения пересоздают сами. Данные, настройки,
-профили и проекты не затрагиваются.
+The rule: only things that apps recreate on their own get deleted. Data,
+settings, profiles and projects are left alone.
 
-### janitor и Mole (`mo clean`)
+### janitor vs. Mole (`mo clean`)
 
-v2.1 закрывает тот же состав целей, что `mo clean`, но **по возрасту**, а не
-«всё и сразу»: для ежедневного автозапуска так бережнее — горячие кэши не
-пересоздаются каждое утро. Что janitor сознательно **не** повторяет за Mole:
-поиск осиротевших данных удалённых приложений (сложная эвристика — не для
-ночного крона) и разовые операции вроде незавершённых бэкапов Time Machine.
-Для этого Mole и остаётся: janitor — ежедневная гигиена, `mo clean` — ручная
-глубокая чистка. Инструменты не конфликтуют.
+v2.1 covers the same set of targets as `mo clean`, but **by age** rather than
+"everything at once": for a daily automatic run that's gentler — hot caches
+don't get rebuilt every morning. What janitor deliberately does **not** copy
+from Mole: hunting for orphaned data of uninstalled apps (complex heuristics —
+not for a nightly cron job) and one-off operations like incomplete Time Machine
+backups. That's what Mole is still around for: janitor is daily hygiene,
+`mo clean` is a manual deep clean. The two tools don't conflict.
 
-## Установка
+## Install
 
 ```bash
 ./install.sh
 ```
 
-Ставит LaunchAgent `com.megarohas.janitor` с запуском **ежедневно в 05:00**
-(если Мак спал — launchd выполнит задачу при пробуждении).
+Installs the `com.megarohas.janitor` LaunchAgent, scheduled to run **daily at
+05:00** (if the Mac was asleep, launchd runs the job when it wakes up).
 
-Ручной запуск: `bash clean.sh`. Лог: `~/Library/Logs/janitor.log`.
-Снять с автозапуска: `./uninstall.sh`.
+Manual run: `bash clean.sh`. Log: `~/Library/Logs/janitor.log`.
+Remove from autostart: `./uninstall.sh`.
 
-## История
+## History
 
-- **v1** (2025) — root-демон `com.user.cleaner` + скрипт по абсолютному пути.
-  После переноса папки демон больше года молча падал каждый день в 5:00;
-  вдобавок строки очистки Chrome-кэшей не работали (brace expansion внутри кавычек).
-- **v2** (2026-08) — полный рерайт: пользовательский LaunchAgent вместо root-демона,
-  путь к скрипту вычисляется при установке, исправлены баги, добавлены dev-кэши,
-  Homebrew, Claude и ротация лога MongoDB. Секции независимы, итог пишется в лог
-  с оценкой освобождённого места.
+- **v1** (2025) — a root daemon `com.user.cleaner` + a script at an absolute
+  path. After the folder was moved, the daemon silently failed every day at 5:00
+  for over a year; on top of that, the Chrome cache cleanup lines never worked
+  (brace expansion inside quotes).
+- **v2** (2026-08) — full rewrite: a user LaunchAgent instead of a root daemon,
+  the script path is resolved at install time, bugs fixed, dev caches, Homebrew,
+  Claude and MongoDB log rotation added. Sections are independent; a summary
+  with an estimate of the freed space goes to the log.
